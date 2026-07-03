@@ -1,0 +1,101 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg-page:      #F4F2EE;
+  --bg-sidebar:   #ECEAE4;
+  --bg-main:      #FFFFFF;
+  --bg-hover:     #ECEAE4;
+  --bg-active:    #E4E0D8;
+  --bg-input:     #F9F8F6;
+  --bg-tag:       #ECEAE4;
+
+  --border:       #DDD9D0;
+  --border-light: #ECEAE4;
+
+  --text-primary:   #1A1916;
+  --text-secondary: #6B6760;
+  --text-muted:     #9E9990;
+  --text-inverse:   #FAFAF8;
+
+  --accent:        #C2510E;
+  --accent-light:  #FBF0E9;
+  --accent-border: #F0C4A5;
+
+  --green:  #15803D;
+  --green-bg: #F0FDF4;
+  --amber:  #B45309;
+  --amber-bg: #FFFBEB;
+  --blue:   #1D4ED8;
+  --blue-bg: #EFF6FF;
+  --red:    #B91C1C;
+  --red-bg: #FEF2F2;
+  --gray:   #4B5563;
+  --gray-bg: #F9FAFB;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --sidebar-w: 224px;
+  --font: 'DM Sans', -apple-system, system-ui, sans-serif;
+}
+
+[data-theme="dark"] {
+  --bg-page:      #111110;
+  --bg-sidebar:   #161614;
+  --bg-main:      #1C1B19;
+  --bg-hover:     #232220;
+  --bg-active:    #2A2926;
+  --bg-input:     #232220;
+  --bg-tag:       #2A2926;
+
+  --border:       #2E2C28;
+  --border-light: #252320;
+
+  --text-primary:   #EDEBE6;
+  --text-secondary: #A09B94;
+  --text-muted:     #6B6760;
+  --text-inverse:   #1A1916;
+
+  --accent:        #E07B39;
+  --accent-light:  #2A1A0E;
+  --accent-border: #6B3416;
+
+  --green:  #4ADE80;
+  --green-bg: #052E16;
+  --amber:  #FCD34D;
+  --amber-bg: #1C1400;
+  --blue:   #93C5FD;
+  --blue-bg: #0C1A2E;
+  --red:    #FCA5A5;
+  --red-bg: #1F0707;
+  --gray:   #9CA3AF;
+  --gray-bg: #1F2937;
+}
+
+html, body, #root {
+  height: 100%;
+  font-family: var(--font);
+  font-size: 15px;
+  color: var(--text-primary);
+  background: var(--bg-page);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+button { font-family: var(--font); cursor: pointer; }
+input, select, textarea { font-family: var(--font); }
+a { color: inherit; text-decoration: none; }
+
+@keyframes formFadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
