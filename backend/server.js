@@ -47,8 +47,12 @@ const upload = multer({
       allowed.test(path.extname(file.originalname).toLowerCase()) &&
       allowed.test(file.mimetype);
     cb(null, isValid);
-    if (!isValid) cb(new Error("Only image files are allowed"));
   },
+});
+
+const backupUpload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
 });
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -159,6 +163,28 @@ async function initDB(retries = 30, delay = 2000) {
   } catch (err) {
     if (!err.message.includes("Duplicate column")) {
       console.log("ℹ️ season_status column already exists or error:", err.message);
+    }
+  }
+
+  // Add deleted_at column if it doesn't exist
+  try {
+    await pool.execute(
+      `ALTER TABLE animes ADD COLUMN deleted_at BIGINT DEFAULT NULL`,
+    );
+    console.log("✅ Added deleted_at to animes");
+  } catch (err) {
+    if (!err.message.includes("Duplicate column")) {
+      console.log("ℹ️ deleted_at column already exists or error:", err.message);
+    }
+  }
+  try {
+    await pool.execute(
+      `ALTER TABLE seasons ADD COLUMN deleted_at BIGINT DEFAULT NULL`,
+    );
+    console.log("✅ Added deleted_at to seasons");
+  } catch (err) {
+    if (!err.message.includes("Duplicate column")) {
+      console.log("ℹ️ deleted_at column already exists or error:", err.message);
     }
   }
 
@@ -632,7 +658,7 @@ app.get("/api/backup/export", async (req, res) => {
   }
 });
 
-app.post("/api/backup/import", upload.single("backup"), async (req, res) => {
+app.post("/api/backup/import", backupUpload.single("backup"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "Backup file is required" });
     const data = JSON.parse(fs.readFileSync(req.file.path, "utf-8"));

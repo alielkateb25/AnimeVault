@@ -26,6 +26,12 @@ function IconEmpty({ size = 32 }) {
 function IconDot({ size = 6 }) {
   return <svg width={size} height={size} viewBox="0 0 6 6" fill="currentColor"><circle cx="3" cy="3" r="3"/></svg>
 }
+function IconDownload({ size = 14 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+}
+function IconUpload({ size = 14 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+}
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const API_URL = ''
@@ -1288,36 +1294,59 @@ function Sidebar({ animes, activeNav, onNav, theme, onThemeToggle, onExport, onI
         <NavItem id="completed" label="Completed" count={counts.completed} />
       </nav>
 
-      <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
+      <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border)' }}>
         <button
           onClick={onThemeToggle}
           style={{
             display: 'flex', alignItems: 'center', gap: 8,
             background: 'none', border: 'none', cursor: 'pointer',
-            color: 'var(--text-secondary)', fontSize: 13, padding: '4px 0',
-            width: '100%', transition: 'color 0.15s',
+            color: 'var(--text-secondary)', fontSize: 12, padding: '6px 8px',
+            width: '100%', borderRadius: 'var(--radius-sm)',
+            transition: 'background 0.15s, color 0.15s',
           }}
-          onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
-          onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--accent)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)' }}
         >
-          {theme === 'dark' ? <IconSun size={15} /> : <IconMoon size={15} />}
+          {theme === 'dark' ? <IconSun size={14} /> : <IconMoon size={14} />}
           {theme === 'dark' ? 'Light mode' : 'Dark mode'}
         </button>
-        <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+
+        <p style={{ fontSize: 11, color: 'var(--text-muted)', padding: '4px 8px', marginTop: 2 }}>
           {animes.length} anime{animes.length !== 1 ? 's' : ''}
         </p>
+
+        <div style={{ height: 1, background: 'var(--border-light)', margin: '6px 8px' }} />
+
+        <p style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.08em', padding: '0 8px 6px', textTransform: 'uppercase' }}>
+          Data
+        </p>
+
         <input ref={importRef} type="file" accept=".json" onChange={onImport} style={{ display: 'none' }} />
-        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+        <div style={{ display: 'flex', gap: 6, padding: '0 4px' }}>
           <button onClick={onExport} style={{
-            flex: 1, padding: '5px 0', fontSize: 11, fontWeight: 500,
-            background: 'var(--bg-hover)', color: 'var(--text-secondary)',
-            border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer',
-          }}>Export</button>
+            flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+            padding: '6px 8px', fontSize: 11, fontWeight: 500,
+            background: 'transparent', color: 'var(--text-secondary)',
+            border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+            cursor: 'pointer', transition: 'background 0.15s, color 0.15s, border-color 0.15s',
+          }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-active)'; e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.borderColor = 'var(--accent-border)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border)' }}
+          >
+            <IconDownload size={12} /> Export
+          </button>
           <button onClick={() => importRef.current?.click()} style={{
-            flex: 1, padding: '5px 0', fontSize: 11, fontWeight: 500,
-            background: 'var(--bg-hover)', color: 'var(--text-secondary)',
-            border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer',
-          }}>Import</button>
+            flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+            padding: '6px 8px', fontSize: 11, fontWeight: 500,
+            background: 'transparent', color: 'var(--text-secondary)',
+            border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+            cursor: 'pointer', transition: 'background 0.15s, color 0.15s, border-color 0.15s',
+          }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-active)'; e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.borderColor = 'var(--accent-border)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border)' }}
+          >
+            <IconUpload size={12} /> Import
+          </button>
         </div>
       </div>
     </aside>
