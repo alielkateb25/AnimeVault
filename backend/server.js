@@ -6,6 +6,9 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const { ZipArchive } = require("archiver");
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,7 +55,7 @@ const upload = multer({
 
 const backupUpload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 200 * 1024 * 1024 },
 });
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -650,9 +653,29 @@ app.get("/api/backup/export", async (req, res) => {
     }
     const data = animes.map((a) => ({ ...a, seasons: seasonsByAnime[a.id] || [] }));
 
-    res.setHeader("Content-Type", "application/json");
-    res.setHeader("Content-Disposition", `attachment; filename="animevault_${Date.now()}.json"`);
-    res.json(data);
+    const tmpDir = fs.mkdtempSync("/tmp/animevault-");
+    const jsonPath = path.join(tmpDir, "data.json");
+    fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2));
+
+    const archive = new ZipArchive({ zlib: { level: 9 } });
+    archive.append(fs.createReadStream(jsonPath), { name: "data.json" });
+
+    const imageSet = new Set();
+    for (const a of animes) {
+      if (a.image && fs.existsSync(path.join(UPLOAD_DIR, a.image))) {
+        imageSet.add(a.image);
+      }
+    }
+    for (const img of imageSet) {
+      archive.file(path.join(UPLOAD_DIR, img), { name: `images/${img}` });
+    }
+
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename="animevault_${Date.now()}.zip"`);
+    archive.pipe(res);
+    await archive.finalize();
+
+    fs.rmSync(tmpDir, { recursive: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -661,8 +684,34 @@ app.get("/api/backup/export", async (req, res) => {
 app.post("/api/backup/import", backupUpload.single("backup"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "Backup file is required" });
-    const data = JSON.parse(fs.readFileSync(req.file.path, "utf-8"));
+
+    let data;
+    const ext = path.extname(req.file.originalname).toLowerCase();
+
+    if (ext === ".zip") {
+      const tmpDir = fs.mkdtempSync("/tmp/animevault-import-");
+      const { default: decompress } = await import("decompress");
+      await decompress(req.file.path, tmpDir);
+      const jsonPath = path.join(tmpDir, "data.json");
+      if (!fs.existsSync(jsonPath))
+        return res.status(400).json({ error: "ZIP must contain a data.json file" });
+      data = JSON.parse(fs.readFileSync(jsonPath, "utf-8"));
+
+      const imagesDir = path.join(tmpDir, "images");
+      if (fs.existsSync(imagesDir)) {
+        const files = fs.readdirSync(imagesDir);
+        for (const f of files) {
+          const src = path.join(imagesDir, f);
+          const dst = path.join(UPLOAD_DIR, f);
+          fs.copyFileSync(src, dst);
+        }
+      }
+      fs.rmSync(tmpDir, { recursive: true });
+    } else {
+      data = JSON.parse(fs.readFileSync(req.file.path, "utf-8"));
+    }
     fs.unlinkSync(req.file.path);
+
     if (!Array.isArray(data) || !data.length)
       return res.status(400).json({ error: "Invalid backup format" });
 

@@ -1662,13 +1662,15 @@ export default function App() {
   const handleExport = async () => {
     try {
       const res = await fetch(`${API_URL}/api/backup/export`)
-      const body = await res.json()
-      if (!res.ok) throw new Error(body.error || 'Export failed')
-      const blob = new Blob([JSON.stringify(body, null, 2)], { type: 'application/json' })
+      if (!res.ok) {
+        const body = await res.json()
+        throw new Error(body.error || 'Export failed')
+      }
+      const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `animevault_${Date.now()}.json`
+      a.download = `animevault_${Date.now()}.zip`
       a.click()
       URL.revokeObjectURL(url)
       showToast('Backup downloaded!')
