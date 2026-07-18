@@ -1321,7 +1321,7 @@ function Sidebar({ animes, activeNav, onNav, theme, onThemeToggle, onExport, onI
           Data
         </p>
 
-        <input ref={importRef} type="file" accept=".json" onChange={onImport} style={{ display: 'none' }} />
+        <input ref={importRef} type="file" accept=".json,.zip" onChange={onImport} style={{ display: 'none' }} />
         <div style={{ display: 'flex', gap: 6, padding: '0 4px' }}>
           <button onClick={onExport} style={{
             flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,

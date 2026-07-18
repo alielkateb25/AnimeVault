@@ -643,6 +643,7 @@ app.delete("/api/animes/:id", async (req, res) => {
 // ── Backup ─────────────────────────────────────────────────────────────────────
 
 app.get("/api/backup/export", async (req, res) => {
+  let tmpDir;
   try {
     const [animes] = await pool.execute("SELECT * FROM animes ORDER BY id");
     const [seasons] = await pool.execute("SELECT * FROM seasons ORDER BY anime_id, season_number");
@@ -653,31 +654,39 @@ app.get("/api/backup/export", async (req, res) => {
     }
     const data = animes.map((a) => ({ ...a, seasons: seasonsByAnime[a.id] || [] }));
 
-    const tmpDir = fs.mkdtempSync("/tmp/animevault-");
+    tmpDir = fs.mkdtempSync("/tmp/animevault-");
     const jsonPath = path.join(tmpDir, "data.json");
     fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2));
 
     const archive = new ZipArchive({ zlib: { level: 9 } });
+
+    const done = new Promise((resolve, reject) => {
+      archive.on("error", reject);
+      archive.on("finish", resolve);
+    });
+
     archive.append(fs.createReadStream(jsonPath), { name: "data.json" });
 
-    const imageSet = new Set();
     for (const a of animes) {
-      if (a.image && fs.existsSync(path.join(UPLOAD_DIR, a.image))) {
-        imageSet.add(a.image);
+      if (a.image) {
+        const imgPath = path.join(UPLOAD_DIR, a.image);
+        if (fs.existsSync(imgPath)) {
+          archive.file(imgPath, { name: `images/${a.image}` });
+        }
       }
-    }
-    for (const img of imageSet) {
-      archive.file(path.join(UPLOAD_DIR, img), { name: `images/${img}` });
     }
 
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="animevault_${Date.now()}.zip"`);
     archive.pipe(res);
-    await archive.finalize();
-
-    fs.rmSync(tmpDir, { recursive: true });
+    archive.finalize();
+    await done;
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    }
+  } finally {
+    if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
 
