@@ -100,14 +100,20 @@ Go to http://localhost:5173 in your browser.
 
 ```
 animevault-v2/
+├── README.md                ← project overview
 ├── INSTRUCTIONS.md          ← this file
+├── docker-compose.yml       ← Docker services (frontend, backend, mysql)
 ├── backend/
 │   ├── package.json         ← backend dependencies
-│   └── server.js            ← Express API + MySQL logic
+│   ├── server.js            ← Express API + MySQL logic
+│   ├── Dockerfile           ← Node 20 Alpine
+│   └── uploads/             ← anime cover images
 └── frontend/
     ├── package.json         ← frontend dependencies
     ├── vite.config.js       ← dev server config
     ├── index.html
+    ├── Dockerfile           ← multi-stage (Vite → nginx:alpine)
+    ├── nginx.conf           ← reverse proxy config
     └── src/
         ├── main.jsx         ← React entry point
         ├── App.jsx          ← all UI components and logic
@@ -131,30 +137,21 @@ animevault-v2/
 
 ## Moving your data to another computer
 
+AnimeVault has a built-in **JSON export/import** system — no `mysqldump` needed.
+
 ### Export (on the old computer)
-```bash
-# Dump the database
-mysqldump -u animevault -panimevault animevault > animevault_backup.sql
 
-# If your MySQL uses port 3307 (like the Docker setup), add -P 3307
-mysqldump -u animevault -panimevault -P 3307 animevault > animevault_backup.sql
-
-# Copy the anime images too
-tar czf uploads_backup.tar.gz backend/uploads/
-```
-
-Transfer the files (`animevault_backup.sql` + `uploads_backup.tar.gz`) via USB, SCP, cloud storage, etc.
+1. Open the app in your browser
+2. In the sidebar footer, click **Export**
+3. A `.json` file downloads with all your anime and season data
 
 ### Import (on the new computer)
-```bash
-# Make sure MySQL is running and the animevault database exists first
-mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS animevault;"
 
-# Import the data
-mysql -u animevault -panimevault animevault < animevault_backup.sql
+1. Set up the app on the new computer (follow the setup steps above)
+2. Open the app in your browser
+3. In the sidebar footer, click **Import**
+4. Select the `.json` file you exported
 
-# Restore images
-tar xzf uploads_backup.tar.gz
-```
+All data is replaced in a single transaction — if anything fails, nothing changes.
 
-Make sure the MySQL user `animevault` exists on the new computer and has the correct password (set it in `backend/server.js`).
+> **Transferring images:** The export only includes image filenames, not the image files themselves. If you want to keep your cover images, copy the `backend/uploads/` folder from the old machine to the new one using USB, SCP, cloud storage, etc.
