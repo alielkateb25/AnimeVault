@@ -126,3 +126,35 @@ animevault-v2/
 | `npm install` fails | Make sure you're in the right folder (backend or frontend) |
 | Blank page in browser | Make sure BOTH terminals are running |
 | Port already in use | Restart your computer or kill the process using the port |
+
+---
+
+## Moving your data to another computer
+
+### Export (on the old computer)
+```bash
+# Dump the database
+mysqldump -u animevault -panimevault animevault > animevault_backup.sql
+
+# If your MySQL uses port 3307 (like the Docker setup), add -P 3307
+mysqldump -u animevault -panimevault -P 3307 animevault > animevault_backup.sql
+
+# Copy the anime images too
+tar czf uploads_backup.tar.gz backend/uploads/
+```
+
+Transfer the files (`animevault_backup.sql` + `uploads_backup.tar.gz`) via USB, SCP, cloud storage, etc.
+
+### Import (on the new computer)
+```bash
+# Make sure MySQL is running and the animevault database exists first
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS animevault;"
+
+# Import the data
+mysql -u animevault -panimevault animevault < animevault_backup.sql
+
+# Restore images
+tar xzf uploads_backup.tar.gz
+```
+
+Make sure the MySQL user `animevault` exists on the new computer and has the correct password (set it in `backend/server.js`).

@@ -54,12 +54,20 @@ const upload = multer({
 
 let pool;
 
-async function initDB() {
-  pool = mysql.createPool(DB_CONFIG);
+async function initDB(retries = 30, delay = 2000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      pool = mysql.createPool(DB_CONFIG);
+      await pool.getConnection();
+      break;
+    } catch (err) {
+      if (i === retries - 1) throw err;
+      console.log(`⏳ Waiting for MySQL (${i + 1}/${retries})…`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
 
-  const conn = await pool.getConnection();
   console.log("✅ Connected to MySQL");
-  conn.release();
 
   await pool.execute(`
     CREATE TABLE IF NOT EXISTS animes (
@@ -130,14 +138,51 @@ async function initDB() {
     )
   `);
 
+  // Add current_episode column if it doesn't exist
+  try {
+    await pool.execute(
+      `ALTER TABLE seasons ADD COLUMN current_episode INT NOT NULL DEFAULT 1`,
+    );
+    console.log("✅ Added current_episode column");
+  } catch (err) {
+    if (!err.message.includes("Duplicate column")) {
+      console.log("ℹ️ current_episode column already exists or error:", err.message);
+    }
+  }
+
+  // Add season_status column if it doesn't exist
+  try {
+    await pool.execute(
+      `ALTER TABLE seasons ADD COLUMN season_status VARCHAR(50) NOT NULL DEFAULT 'watching'`,
+    );
+    console.log("✅ Added season_status column");
+  } catch (err) {
+    if (!err.message.includes("Duplicate column")) {
+      console.log("ℹ️ season_status column already exists or error:", err.message);
+    }
+  }
+
   console.log("✅ Tables ready");
 }
 
 // ── Middleware ────────────────────────────────────────────────────────────────
-app.use(cors({ origin: "http://localhost:5173" }));
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) return cb(null, true)
+    cb(null, true)
+  },
+}));
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // ── Validation ────────────────────────────────────────────────────────────────
+const VALID_SEASON_STATUSES = [
+  "watching",
+  "plan-to-watch",
+  "on-hold",
+  "dropped",
+  "completed",
+];
+
 const VALID_STATUSES = [
   "watching",
   "plan-to-watch",
@@ -155,7 +200,7 @@ function validate(body) {
     isNaN(body.episode)
   )
     errors.push("Episode must be a number");
-  if (Number(body.episode) < 0) errors.push("Episode cannot be negative");
+  if (Number(body.episode) < 1) errors.push("Minimum episode is 1");
   if (
     body.total_episodes !== null &&
     body.total_episodes !== undefined &&
@@ -275,12 +320,18 @@ app.post("/api/animes", upload.single("image"), async (req, res) => {
     // Insert seasons if provided
     if (Array.isArray(seasons) && seasons.length) {
       for (const s of seasons) {
+        const seasonStatus = s.season_status && VALID_SEASON_STATUSES.includes(s.season_status) ? s.season_status : 'watching';
+        const currentEp = s.current_episode != null && s.current_episode !== '' ? Number(s.current_episode) : 1;
         await pool.execute(
-          `INSERT INTO seasons (anime_id, season_number, episode_count, link, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [animeId, s.season_number, toNull(s.episode_count), s.link?.trim() || "", now, now],
+          `INSERT INTO seasons (anime_id, season_number, episode_count, link, season_status, current_episode, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [animeId, s.season_number, toNull(s.episode_count), s.link?.trim() || "", seasonStatus, currentEp, now, now],
         );
       }
+      const sortedSeasons = [...seasons].sort((a, b) => a.season_number - b.season_number);
+      const firstUncompleted = sortedSeasons.find(s => s.season_status !== "completed");
+      const derivedStatus = firstUncompleted ? firstUncompleted.season_status || "watching" : "completed";
+      await pool.execute("UPDATE animes SET status=? WHERE id=?", [derivedStatus, animeId]);
     }
 
     const [rows] = await pool.execute("SELECT * FROM animes WHERE id = ?", [
@@ -354,12 +405,22 @@ app.put("/api/animes/:id", upload.single("image"), async (req, res) => {
     if (Array.isArray(seasons)) {
       await pool.execute("DELETE FROM seasons WHERE anime_id = ?", [req.params.id]);
       for (const s of seasons) {
+        const seasonStatus = s.season_status && VALID_SEASON_STATUSES.includes(s.season_status) ? s.season_status : 'watching';
+        const currentEp = s.current_episode != null && s.current_episode !== '' ? Number(s.current_episode) : 1;
         await pool.execute(
-          `INSERT INTO seasons (anime_id, season_number, episode_count, link, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [req.params.id, s.season_number, toNull(s.episode_count), s.link?.trim() || "", now, now],
+          `INSERT INTO seasons (anime_id, season_number, episode_count, link, season_status, current_episode, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [req.params.id, s.season_number, toNull(s.episode_count), s.link?.trim() || "", seasonStatus, currentEp, now, now],
         );
       }
+      // Derive anime status from seasons
+      const sortedSeasons = [...seasons].sort((a, b) => a.season_number - b.season_number);
+      const firstUncompleted = sortedSeasons.find(s => s.season_status !== "completed");
+      const derivedStatus = firstUncompleted ? firstUncompleted.season_status || "watching" : "completed";
+      await pool.execute(
+        "UPDATE animes SET status=?, updated_at=? WHERE id=?",
+        [derivedStatus, now, req.params.id],
+      );
     }
 
     const [rows] = await pool.execute("SELECT * FROM animes WHERE id = ?", [
@@ -388,18 +449,34 @@ app.patch("/api/animes/:id/episode", async (req, res) => {
     let newEp = Number(req.body.episode);
     if (isNaN(newEp))
       return res.status(400).json({ error: "Invalid episode number" });
-    if (newEp < 0) newEp = 0;
+    if (newEp < 1) newEp = 1;
 
     const newSeason =
       req.body.current_season !== undefined
         ? Number(req.body.current_season)
         : anime.current_season;
 
-    // Clamp episode within season's episode_count if seasons exist
     const [seasons] = await pool.execute(
       "SELECT * FROM seasons WHERE anime_id = ? ORDER BY season_number ASC",
       [req.params.id],
     );
+
+    // Save old season's current_episode before switching
+    if (newSeason !== anime.current_season) {
+      await pool.execute(
+        "UPDATE seasons SET current_episode=? WHERE anime_id=? AND season_number=?",
+        [Math.max(anime.episode, 1), req.params.id, anime.current_season],
+      );
+      // Load the new season's saved episode
+      const newSeasonRow = seasons.find((s) => s.season_number === newSeason);
+      if (newSeasonRow && newSeasonRow.current_episode != null) {
+        newEp = Math.max(Number(newSeasonRow.current_episode), 1);
+      } else {
+        newEp = 1;
+      }
+    }
+
+    // Clamp episode within season's episode_count if seasons exist
     if (seasons.length) {
       const curSeason = seasons.find((s) => s.season_number === newSeason);
       if (curSeason?.episode_count !== null && newEp > curSeason.episode_count)
@@ -408,15 +485,101 @@ app.patch("/api/animes/:id/episode", async (req, res) => {
       newEp = anime.total_episodes;
     }
 
+    // Save to season's current_episode
     await pool.execute(
-      "UPDATE animes SET episode=?, current_season=?, updated_at=? WHERE id=?",
-      [newEp, newSeason, Date.now(), req.params.id],
+      "UPDATE seasons SET current_episode=? WHERE anime_id=? AND season_number=?",
+      [newEp, req.params.id, newSeason],
     );
+
+    // Auto-complete season when episode reaches max
+    if (req.body.season_status) {
+      await pool.execute(
+        "UPDATE seasons SET season_status=? WHERE anime_id=? AND season_number=?",
+        [req.body.season_status, req.params.id, newSeason],
+      );
+      const [seasonRows] = await pool.execute(
+        "SELECT season_status, season_number FROM seasons WHERE anime_id = ? AND deleted_at IS NULL ORDER BY season_number ASC",
+        [req.params.id],
+      );
+      const firstUncompleted = seasonRows.find(s => s.season_status !== "completed");
+      const derivedStatus = firstUncompleted ? firstUncompleted.season_status || "watching" : "completed";
+      await pool.execute(
+        "UPDATE animes SET episode=?, current_season=?, status=?, updated_at=? WHERE id=?",
+        [newEp, newSeason, derivedStatus, Date.now(), req.params.id],
+      );
+    } else {
+      await pool.execute(
+        "UPDATE animes SET episode=?, current_season=?, updated_at=? WHERE id=?",
+        [newEp, newSeason, Date.now(), req.params.id],
+      );
+    }
 
     const [updated] = await pool.execute("SELECT * FROM animes WHERE id = ?", [
       req.params.id,
     ]);
     // Re-fetch seasons to include with the response
+    const [seasonsRows] = await pool.execute(
+      "SELECT * FROM seasons WHERE anime_id = ? ORDER BY season_number ASC",
+      [req.params.id],
+    );
+    res.json({ ...updated[0], seasons: seasonsRows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH season status
+app.patch("/api/animes/:id/season-status", async (req, res) => {
+  try {
+    const { season_number, status } = req.body;
+    if (!season_number) return res.status(400).json({ error: "season_number is required" });
+    if (!VALID_SEASON_STATUSES.includes(status)) return res.status(400).json({
+      error: `Season status must be one of: ${VALID_SEASON_STATUSES.join(", ")}`,
+    });
+
+    const [result] = await pool.execute(
+      "UPDATE seasons SET season_status=?, updated_at=? WHERE anime_id=? AND season_number=?",
+      [status, Date.now(), req.params.id, season_number],
+    );
+    if (!result.affectedRows) return res.status(404).json({ error: "Season not found" });
+
+    // Derive anime status from season statuses (first uncompleted season wins)
+    const [seasonRows] = await pool.execute(
+      "SELECT season_status, season_number FROM seasons WHERE anime_id = ? AND deleted_at IS NULL ORDER BY season_number ASC",
+      [req.params.id],
+    );
+    const firstUncompleted = seasonRows.find(s => s.season_status !== "completed");
+    const derivedStatus = firstUncompleted ? firstUncompleted.season_status || "watching" : "completed";
+    await pool.execute(
+      "UPDATE animes SET status=?, updated_at=? WHERE id=?",
+      [derivedStatus, Date.now(), req.params.id],
+    );
+
+    const [updated] = await pool.execute("SELECT * FROM animes WHERE id = ?", [req.params.id]);
+    const [seasonsRows] = await pool.execute(
+      "SELECT * FROM seasons WHERE anime_id = ? ORDER BY season_number ASC",
+      [req.params.id],
+    );
+    res.json({ ...updated[0], seasons: seasonsRows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH anime status (e.g., mark complete)
+app.patch("/api/animes/:id/status", async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!VALID_STATUSES.includes(status)) return res.status(400).json({
+      error: `Status must be one of: ${VALID_STATUSES.join(", ")}`,
+    });
+
+    await pool.execute(
+      "UPDATE animes SET status=?, updated_at=? WHERE id=?",
+      [status, Date.now(), req.params.id],
+    );
+
+    const [updated] = await pool.execute("SELECT * FROM animes WHERE id = ?", [req.params.id]);
     const [seasonsRows] = await pool.execute(
       "SELECT * FROM seasons WHERE anime_id = ? ORDER BY season_number ASC",
       [req.params.id],
@@ -443,6 +606,98 @@ app.delete("/api/animes/:id", async (req, res) => {
 
     await pool.execute("DELETE FROM animes WHERE id = ?", [req.params.id]);
     res.json({ success: true, id: Number(req.params.id) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Backup ─────────────────────────────────────────────────────────────────────
+
+app.get("/api/backup/export", async (req, res) => {
+  try {
+    const [animes] = await pool.execute("SELECT * FROM animes ORDER BY id");
+    const [seasons] = await pool.execute("SELECT * FROM seasons ORDER BY anime_id, season_number");
+    const seasonsByAnime = {};
+    for (const s of seasons) {
+      if (!seasonsByAnime[s.anime_id]) seasonsByAnime[s.anime_id] = [];
+      seasonsByAnime[s.anime_id].push(s);
+    }
+    const data = animes.map((a) => ({ ...a, seasons: seasonsByAnime[a.id] || [] }));
+
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", `attachment; filename="animevault_${Date.now()}.json"`);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/backup/import", upload.single("backup"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "Backup file is required" });
+    const data = JSON.parse(fs.readFileSync(req.file.path, "utf-8"));
+    fs.unlinkSync(req.file.path);
+    if (!Array.isArray(data) || !data.length)
+      return res.status(400).json({ error: "Invalid backup format" });
+
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+    try {
+      await connection.execute("DELETE FROM seasons");
+      await connection.execute("DELETE FROM animes");
+      const now = Date.now();
+      for (const anime of data) {
+        const { seasons, id, deleted_at, created_at, updated_at, ...rest } = anime;
+        const [result] = await connection.execute(
+          `INSERT INTO animes (name, link, episode, total_episodes, status, notes, image, original_filename, current_season, type, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            rest.name, rest.link || "", Number(rest.episode) || 1,
+            toNull(rest.total_episodes), rest.status || "watching",
+            rest.notes || "", rest.image || null, rest.original_filename || "",
+            rest.current_season || 1, rest.type || "tv", now, now,
+          ],
+        );
+        if (Array.isArray(seasons)) {
+          for (const s of seasons) {
+            const { id: sid, anime_id, deleted_at: sd, created_at: sc, updated_at: su, ...sData } = s;
+            await connection.execute(
+              `INSERT INTO seasons (anime_id, season_number, episode_count, link, season_status, current_episode, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+              [
+                result.insertId, sData.season_number || 1,
+                toNull(sData.episode_count), sData.link || "",
+                sData.season_status || "watching", Number(sData.current_episode) || 1,
+                now, now,
+              ],
+            );
+          }
+        }
+      }
+      await connection.commit();
+      connection.release();
+
+      const [rows] = await pool.execute(`
+        SELECT a.*,
+          JSON_ARRAYAGG(
+            JSON_OBJECT(
+              'id', s.id, 'season_number', s.season_number,
+              'episode_count', s.episode_count, 'link', s.link,
+              'season_status', s.season_status, 'current_episode', s.current_episode
+            )
+          ) as seasons
+        FROM animes a
+        LEFT JOIN seasons s ON s.anime_id = a.id AND s.deleted_at IS NULL
+        WHERE a.deleted_at IS NULL
+        GROUP BY a.id
+        ORDER BY a.updated_at DESC
+      `);
+      res.json(rows);
+    } catch (err) {
+      await connection.rollback();
+      connection.release();
+      throw err;
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

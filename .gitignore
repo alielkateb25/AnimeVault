@@ -4,3 +4,6 @@ frontend/.env
 frontend/node_modules
 frontend/dist
 .superpowers/
+backend/uploads
+npm-debug.log
+*.1.*

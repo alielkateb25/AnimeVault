@@ -1,7 +1,34 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+
+// ─── SVG Icons (inline, no deps) ─────────────────────────────────────────────
+
+function IconTV({ size = 14 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="16 21 16 17 8 17 8 21"/></svg>
+}
+function IconMovie({ size = 14 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"/><line x1="8" y1="2" x2="8" y2="22"/><line x1="16" y1="2" x2="16" y2="22"/><line x1="2" y1="8" x2="22" y2="8"/></svg>
+}
+function IconImage({ size = 24 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+}
+function IconSun({ size = 15 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+}
+function IconMoon({ size = 15 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+}
+function IconSparkle({ size = 24 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+}
+function IconEmpty({ size = 32 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+}
+function IconDot({ size = 6 }) {
+  return <svg width={size} height={size} viewBox="0 0 6 6" fill="currentColor"><circle cx="3" cy="3" r="3"/></svg>
+}
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-const API_URL = 'http://localhost:3001'
+const API_URL = ''
 
 const STATUSES = {
   watching: { label: 'Watching', color: 'var(--green)', bg: 'var(--green-bg)' },
@@ -13,6 +40,14 @@ const STATUSES = {
 
 const UNFINISHED_STATUSES = ['watching', 'plan-to-watch', 'on-hold', 'dropped']
 
+const SEASON_STATUSES = {
+  watching: { label: 'Watching', color: 'var(--green)', bg: 'var(--green-bg)' },
+  completed: { label: 'Completed', color: 'var(--gray)', bg: 'var(--gray-bg)' },
+  'plan-to-watch': { label: 'Plan to Watch', color: 'var(--blue)', bg: 'var(--blue-bg)' },
+  'on-hold': { label: 'On Hold', color: 'var(--amber)', bg: 'var(--amber-bg)' },
+  dropped: { label: 'Dropped', color: 'var(--red)', bg: 'var(--red-bg)' },
+}
+
 const NAV = [
   { id: 'all', label: 'All Active', statuses: UNFINISHED_STATUSES },
   { id: 'watching', label: 'Watching', statuses: ['watching'] },
@@ -21,7 +56,7 @@ const NAV = [
   { id: 'dropped', label: 'Dropped', statuses: ['dropped'] },
 ]
 
-const BLANK = { name: '', link: '', episode: '0', total_episodes: '', status: 'watching', notes: '', image: null, imageFile: null, type: 'tv', current_season: 1, seasons: [{ season_number: 1, episode_count: '', link: '' }] }
+const BLANK = { name: '', link: '', episode: '1', total_episodes: '', status: 'watching', notes: '', image: null, imageFile: null, type: 'tv', current_season: 1, seasons: [{ season_number: 1, episode_count: '', link: '', season_status: 'watching', current_episode: '1' }] }
 
 // ─── API helpers (updated for multipart form data) ─────────────────────────
 
@@ -53,7 +88,13 @@ const api = {
   getAll: () => apiFetch('/animes'),
   create: (data, image) => apiFetchWithImage('/animes', 'POST', data, image),
   update: (id, data, image, keepImage) => apiFetchWithImage(`/animes/${id}`, 'PUT', { ...data, image_keep: keepImage }, image),
-  patchEpisode: (id, ep, season) => apiFetch(`/animes/${id}/episode`, { method: 'PATCH', body: JSON.stringify({ episode: ep, current_season: season }) }),
+  patchEpisode: (id, ep, season, seasonStatus) => {
+    const body = { episode: ep, current_season: season }
+    if (seasonStatus) body.season_status = seasonStatus
+    return apiFetch(`/animes/${id}/episode`, { method: 'PATCH', body: JSON.stringify(body) })
+  },
+  patchSeasonStatus: (id, seasonNumber, status) => apiFetch(`/animes/${id}/season-status`, { method: 'PATCH', body: JSON.stringify({ season_number: seasonNumber, status }) }),
+  patchStatus: (id, status) => apiFetch(`/animes/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   remove: (id) => apiFetch(`/animes/${id}`, { method: 'DELETE' }),
 }
 
@@ -101,9 +142,9 @@ function Btn({ onClick, variant = 'default', style = {}, children, disabled }) {
     display: 'inline-flex', alignItems: 'center', gap: 6,
     padding: '7px 14px', borderRadius: 'var(--radius-md)',
     fontSize: 13, fontWeight: 500, border: 'none',
-    transition: 'opacity 0.15s, background 0.15s',
+    transition: 'background 0.2s, color 0.2s, border-color 0.2s, transform 0.15s var(--ease-spring)',
     cursor: disabled ? 'not-allowed' : 'pointer',
-    opacity: disabled ? 0.5 : 1,
+    opacity: disabled ? 0.45 : 1,
   }
   const variants = {
     default: { background: 'var(--bg-hover)', color: 'var(--text-primary)' },
@@ -112,7 +153,13 @@ function Btn({ onClick, variant = 'default', style = {}, children, disabled }) {
     danger: { background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid transparent' },
   }
   return (
-    <button onClick={onClick} disabled={disabled} style={{ ...base, ...variants[variant], ...style }}>
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{ ...base, ...variants[variant], ...style }}
+      onMouseEnter={e => { if (!disabled) { e.currentTarget.style.transform = 'scale(1.02)' } }}
+      onMouseLeave={e => { if (!disabled) { e.currentTarget.style.transform = 'scale(1)' } }}
+    >
       {children}
     </button>
   )
@@ -203,7 +250,7 @@ function AnimeForm({ initial, onSave, onCancel, loading }) {
     const e = {}
     if (!form.name.trim()) e.name = 'Name is required'
     if (form.episode === '' || isNaN(form.episode)) e.episode = 'Must be a number'
-    if (Number(form.episode) < 0) e.episode = 'Cannot be negative'
+    if (Number(form.episode) < 1) e.episode = 'Minimum is 1'
     if (form.total_episodes !== '') {
       if (isNaN(form.total_episodes) || Number(form.total_episodes) < 1)
         e.total_episodes = 'Must be a positive number'
@@ -228,6 +275,8 @@ function AnimeForm({ initial, onSave, onCancel, loading }) {
           season_number: Number(s.season_number),
           episode_count: s.episode_count !== '' ? Number(s.episode_count) : null,
           link: s.link.trim(),
+          season_status: s.season_status || 'watching',
+          current_episode: s.current_episode != null ? Number(s.current_episode) : 1,
         }))
 
     // Compute total_episodes from seasons if all have counts
@@ -304,11 +353,11 @@ function AnimeForm({ initial, onSave, onCancel, loading }) {
                   fontSize: 12, fontWeight: 500, cursor: 'pointer', textAlign: 'center',
                 }}
               >
-                📺 TV Series
+                <IconTV size={14} /> TV Series
               </button>
               <button
                 type="button"
-                onClick={() => setForm(f => ({ ...f, type: 'movie', episode: '0', seasons: [] }))}
+                onClick={() => setForm(f => ({ ...f, type: 'movie', episode: '1', seasons: [] }))}
                 style={{
                   flex: 1, padding: '7px 10px', borderRadius: 6, height: 34,
                   border: isMovie ? '1px solid var(--accent)' : '1px solid var(--border)',
@@ -317,7 +366,7 @@ function AnimeForm({ initial, onSave, onCancel, loading }) {
                   fontSize: 12, fontWeight: 500, cursor: 'pointer', textAlign: 'center',
                 }}
               >
-                🎬 Movie
+                <IconMovie size={14} /> Movie
               </button>
             </div>
           </Field>
@@ -348,7 +397,7 @@ function AnimeForm({ initial, onSave, onCancel, loading }) {
                 background: 'var(--bg-hover)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 28, color: 'var(--text-muted)',
-              }}>📷</div>
+              }}><IconImage size={28} /></div>
             )}
           </div>
           <div style={{ flex: 1, paddingTop: 10 }}>
@@ -367,19 +416,21 @@ function AnimeForm({ initial, onSave, onCancel, loading }) {
           </div>
         </div>
 
-        {/* 4. Status + Link */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="Status">
-            <select style={inputStyle} value={form.status} onChange={set('status')}>
-              {Object.entries(STATUSES).map(([k, v]) => (
-                <option key={k} value={k}>{v.label}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Streaming link">
-            <input style={inputStyle} placeholder="https://..." value={form.link} onChange={set('link')} />
-          </Field>
-        </div>
+        {/* 4. Status / Link */}
+        {isMovie && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="Status">
+              <select style={inputStyle} value={form.status} onChange={set('status')}>
+                {Object.entries(STATUSES).map(([k, v]) => (
+                  <option key={k} value={k}>{v.label}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Streaming link">
+              <input style={inputStyle} placeholder="https://..." value={form.link} onChange={set('link')} />
+            </Field>
+          </div>
+        )}
 
         <div style={{ height: 1, background: 'var(--border-light)' }} />
 
@@ -417,7 +468,18 @@ function AnimeForm({ initial, onSave, onCancel, loading }) {
                       </button>
                     )}
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                    <Field label="Status">
+                      <select
+                        style={{ ...inputStyle, padding: '6px 8px', fontSize: 12, height: 32 }}
+                        value={s.season_status || 'watching'}
+                        onChange={e => updateSeason(i, 'season_status', e.target.value)}
+                      >
+                        {Object.entries(SEASON_STATUSES).map(([k, v]) => (
+                          <option key={k} value={k}>{v.label}</option>
+                        ))}
+                      </select>
+                    </Field>
                     <Field label="Episodes" error={errors[`season_${i}_count`]}>
                       <input
                         style={{ ...inputStyle, padding: '6px 8px', fontSize: 12, height: 32 }}
@@ -448,9 +510,15 @@ function AnimeForm({ initial, onSave, onCancel, loading }) {
             {form.seasons.length > 0 && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <Field label="Current season">
-                  <select style={inputStyle} value={form.current_season} onChange={set('current_season')}>
+                  <select style={inputStyle} value={form.current_season} onChange={e => {
+                    const newSeason = Number(e.target.value)
+                    setForm(f => {
+                      const season = f.seasons.find(s => s.season_number === newSeason)
+                      return { ...f, current_season: newSeason, episode: season?.current_episode || '1' }
+                    })
+                  }}>
                     {form.seasons.map((s, i) => (
-                      <option key={i} value={s.season_number}>Season {s.season_number}</option>
+                      <option key={i} value={s.season_number}>Season {s.season_number}{s.episode_count ? ` (${s.episode_count} ep)` : ''}</option>
                     ))}
                   </select>
                 </Field>
@@ -479,7 +547,7 @@ function AnimeForm({ initial, onSave, onCancel, loading }) {
             border: '1px solid var(--border-light)',
           }}>
             <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              🎬 A movie is tracked as a single entry. Set status to "Completed" when you've watched it.
+              <IconMovie size={20} /> A movie is tracked as a single entry. Set status to "Completed" when you've watched it.
             </p>
           </div>
         )}
@@ -526,9 +594,22 @@ function computeProgress(anime) {
   if (!totalEpisodes) return null
   const watchedBefore = seasons
     .filter(s => s.season_number < (anime.current_season || 1))
-    .reduce((s, s2) => s + (s2.episode_count || 0), 0)
+    .reduce((s, s2) => s + Number(s2.current_episode || s2.episode_count || 0), 0)
   const totalWatched = watchedBefore + Number(anime.episode || 0)
   return Math.min(100, (totalWatched / totalEpisodes) * 100)
+}
+
+function seasonProgress(season) {
+  if (!season?.episode_count) return null
+  const ep = Number(season.current_episode || 0)
+  return Math.min(100, (ep / Number(season.episode_count)) * 100)
+}
+
+function deriveAnimeStatus(seasons) {
+  seasons = seasons || []
+  const sorted = [...seasons].sort((a, b) => a.season_number - b.season_number)
+  const firstUncompleted = sorted.find(s => s.season_status !== 'completed')
+  return firstUncompleted ? (firstUncompleted.season_status || 'watching') : 'completed'
 }
 
 function getCurrentSeason(anime) {
@@ -563,7 +644,12 @@ function AnimeCard({ anime, onClick }) {
   const [imageLoaded, setImageLoaded] = useState(false)
 
   const isMovie = anime.type === 'movie'
-  const progress = computeProgress(anime)
+  const currentSeason = getCurrentSeason(anime)
+  const cardProgress = isMovie
+    ? (anime.status === 'completed' ? 100 : 0)
+    : currentSeason
+      ? seasonProgress(currentSeason)
+      : computeProgress(anime)
   const epLabel = getEpLabel(anime)
   const link = getLink(anime)
 
@@ -577,18 +663,20 @@ function AnimeCard({ anime, onClick }) {
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius-lg)',
         overflow: 'hidden',
-        transition: 'transform 0.15s, box-shadow 0.15s',
+        transition: 'transform 0.25s var(--ease-spring), box-shadow 0.25s var(--ease-spring), border-color 0.25s',
         display: 'flex',
         flexDirection: 'column',
         cursor: 'pointer',
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.transform = 'translateY(-2px)'
-        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'
+        e.currentTarget.style.transform = 'translateY(-4px)'
+        e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)'
+        e.currentTarget.style.borderColor = 'var(--accent-border)'
       }}
       onMouseLeave={e => {
         e.currentTarget.style.transform = 'translateY(0)'
         e.currentTarget.style.boxShadow = 'none'
+        e.currentTarget.style.borderColor = 'var(--border)'
       }}
     >
       <div style={{
@@ -599,7 +687,7 @@ function AnimeCard({ anime, onClick }) {
       }}>
         {imageUrl ? (
           <>
-            {!imageLoaded && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-hover)' }}>📷</div>}
+            {!imageLoaded && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-hover)' }}><IconImage size={24} /></div>}
             <img
               src={imageUrl}
               alt={anime.name}
@@ -613,9 +701,9 @@ function AnimeCard({ anime, onClick }) {
         ) : (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            height: '100%', fontSize: 48, color: 'var(--text-muted)',
+            height: '100%', color: 'var(--text-muted)',
           }}>
-            🎬
+            <IconMovie size={32} />
           </div>
         )}
 
@@ -631,28 +719,25 @@ function AnimeCard({ anime, onClick }) {
           borderRadius: 'var(--radius-sm)',
           fontSize: 12, fontWeight: 500, color: 'white',
         }}>
-          {isMovie ? '🎬 Movie' : epLabel}
+          {isMovie ? <><IconMovie size={12} /> Movie</> : epLabel}
         </div>
       </div>
 
-      <div style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-          <h3 style={{
-            fontSize: 13, fontWeight: 600,
-            color: 'var(--text-primary)',
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-            flex: 1,
-          }}>
-            {anime.name}
-          </h3>
-        </div>
+      <div style={{ padding: '12px 12px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 8 }}>
+        <h3 style={{
+          fontSize: 13, fontWeight: 600,
+          color: 'var(--text-primary)',
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>
+          {anime.name}
+        </h3>
 
-        {progress !== null && (
-          <div style={{ width: '100%', height: 3, background: 'var(--border)', borderRadius: 2 }}>
+        {cardProgress !== null && (
+          <div style={{ width: '100%', height: 4, background: 'var(--border-light)', borderRadius: 99, overflow: 'hidden' }}>
             <div style={{
-              height: '100%', width: `${progress}%`,
-              background: isMovie && progress === 100 ? 'var(--green)' : 'var(--accent)',
-              borderRadius: 2, transition: 'width 0.3s',
+              height: '100%', width: `${cardProgress}%`,
+              background: cardProgress === 100 ? 'var(--green)' : 'var(--accent)',
+              borderRadius: 99, transition: 'width 0.4s var(--ease-spring)',
             }} />
           </div>
         )}
@@ -663,7 +748,7 @@ function AnimeCard({ anime, onClick }) {
 
 // ─── AnimeModal (detail overlay) ─────────────────────────────────────────────
 
-function AnimeModal({ anime, onClose, onEdit, onDelete, onEpisode }) {
+function AnimeModal({ anime, onClose, onEdit, onDelete, onEpisode, onSeasonStatus, onAnimeStatus }) {
   const [confirming, setConfirming] = useState(false)
   const isMovie = anime.type === 'movie'
   const seasons = anime.seasons || []
@@ -671,7 +756,7 @@ function AnimeModal({ anime, onClose, onEdit, onDelete, onEpisode }) {
   const imageUrl = anime.image ? `${API_URL}/uploads/${anime.image}` : null
 
   const totalWatched = seasons.length
-    ? seasons.filter(s => s.season_number < (anime.current_season || 1)).reduce((s, s2) => s + (s2.episode_count || 0), 0) + Number(anime.episode || 0)
+    ? seasons.filter(s => s.season_number < (anime.current_season || 1)).reduce((s, s2) => s + Number(s2.current_episode || s2.episode_count || 0), 0) + Number(anime.episode || 0)
     : Number(anime.episode || 0)
   const totalEpisodes = seasons.length
     ? seasons.reduce((s, s2) => s + (s2.episode_count || 0), 0)
@@ -683,19 +768,25 @@ function AnimeModal({ anime, onClose, onEdit, onDelete, onEpisode }) {
     const curSeason = seasons.find(s => s.season_number === (anime.current_season || 1))
     const maxEp = curSeason?.episode_count
     let newEp = Number(anime.episode) + delta
-    if (maxEp != null) { if (newEp < 0) newEp = 0; else if (newEp > maxEp) newEp = maxEp }
-    else if (newEp < 0) newEp = 0
+    if (maxEp != null) { if (newEp < 1) newEp = 1; else if (newEp > maxEp) newEp = maxEp }
+    else if (newEp < 1) newEp = 1
     onEpisode(anime.id, newEp, anime.current_season || 1)
   }
 
   const handlePrevSeason = () => {
     const cs = anime.current_season || 1
-    if (cs > 1) onEpisode(anime.id, 0, cs - 1)
+    if (cs > 1) {
+      const prev = seasons.find(s => s.season_number === cs - 1)
+      onEpisode(anime.id, prev?.current_episode || 1, cs - 1)
+    }
   }
 
   const handleNextSeason = () => {
     const cs = anime.current_season || 1
-    if (cs < seasons.length) onEpisode(anime.id, 0, cs + 1)
+    if (cs < seasons.length) {
+      const next = seasons.find(s => s.season_number === cs + 1)
+      onEpisode(anime.id, next?.current_episode || 1, cs + 1)
+    }
   }
 
   const divider = { height: 1, background: 'var(--border-light)', margin: '0 -28px' }
@@ -734,7 +825,10 @@ function AnimeModal({ anime, onClose, onEdit, onDelete, onEpisode }) {
             fontSize: 20, cursor: 'pointer', color: 'var(--text-secondary)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             lineHeight: 1,
+            transition: 'background 0.15s, color 0.15s',
           }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-light)'; e.currentTarget.style.color = 'var(--accent)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-secondary)' }}
         >×</button>
 
         {/* ── Header ── */}
@@ -754,7 +848,7 @@ function AnimeModal({ anime, onClose, onEdit, onDelete, onEpisode }) {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 40, color: 'var(--text-muted)',
             }}>
-              🎬
+              <IconMovie size={32} />
             </div>
           )}
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -769,7 +863,7 @@ function AnimeModal({ anime, onClose, onEdit, onDelete, onEpisode }) {
                   background: 'var(--bg-hover)', padding: '3px 8px',
                   borderRadius: 'var(--radius-sm)', fontWeight: 500,
                 }}>
-                  {isMovie ? '🎬 Movie' : '📺 TV'}
+                  {isMovie ? <><IconMovie size={14} /> Movie</> : <><IconTV size={14} /> TV</>}
                 </span>
               </div>
             </div>
@@ -784,10 +878,10 @@ function AnimeModal({ anime, onClose, onEdit, onDelete, onEpisode }) {
                   background: 'var(--accent)', color: '#fff',
                   borderRadius: 8, fontSize: 14, fontWeight: 500,
                   textDecoration: 'none', alignSelf: 'flex-start',
-                  transition: 'opacity 0.15s',
+                  transition: 'opacity 0.2s, transform 0.2s var(--ease-spring)',
                 }}
-                onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
-                onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                onMouseEnter={e => { e.currentTarget.style.opacity = '0.9'; e.currentTarget.style.transform = 'scale(1.03)' }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'scale(1)' }}
               >
                 ▶ Watch
               </a>
@@ -822,38 +916,74 @@ function AnimeModal({ anime, onClose, onEdit, onDelete, onEpisode }) {
                 Seasons
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                {seasons.map(s => (
-                  <div key={s.season_number} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    background: 'var(--bg-hover)', borderRadius: 10, padding: '11px 14px',
-                  }}>
-                    <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>
-                      Season {s.season_number}
-                      {s.episode_count
-                        ? <span style={{ color: 'var(--text-muted)', fontWeight: 400, marginLeft: 4 }}>
-                            · {s.episode_count} ep{s.episode_count !== 1 ? 's' : ''}
+                {seasons.map(s => {
+                  const sStatus = SEASON_STATUSES[s.season_status] || SEASON_STATUSES.watching
+                  const isCurrent = s.season_number === (anime.current_season || 1)
+                  const isComplete = s.season_status === 'completed'
+                  const maxEp = s.episode_count || anime.total_episodes || 12
+                  const isMaxed = isCurrent && Number(anime.episode) >= maxEp
+                  const seasonLink = s.link || (seasons.length === 1 ? anime.link : '')
+                  return (
+                    <div key={s.season_number} style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      background: isCurrent ? 'var(--accent-light)' : 'var(--bg-hover)',
+                      borderRadius: 10, padding: '10px 14px',
+                      border: isCurrent ? '1px solid var(--accent-border)' : '1px solid transparent',
+                    }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', minWidth: 0, flex: 1 }}>
+                        Season {s.season_number}
+                        {(() => {
+                          const sMax = s.episode_count || 12
+                          const sEp = Number(s.current_episode || (isCurrent ? anime.episode : 1))
+                          return <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>
+                            · Ep {Math.min(sEp, sMax)}/{sMax}
                           </span>
-                        : ''}
-                    </span>
-                    {s.link && (
-                      <a
-                        href={s.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          fontSize: 13, color: 'var(--accent)',
-                          textDecoration: 'none', fontWeight: 600,
-                          whiteSpace: 'nowrap', padding: '5px 12px',
-                          borderRadius: 6, transition: 'background 0.1s',
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'var(--accent-light)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                      >
-                        Watch ↗
-                      </a>
-                    )}
-                  </div>
-                ))}
+                        })()}
+                      </span>
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        fontSize: 11, fontWeight: 500, color: sStatus.color,
+                        background: sStatus.bg, padding: '2px 7px', borderRadius: 'var(--radius-sm)',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {isComplete && <span style={{ fontSize: 10 }}>✓</span>}
+                        {sStatus.label}
+                      </span>
+                      {isMaxed && !isComplete && (
+                        <button
+                          onClick={() => onSeasonStatus(anime.id, s.season_number, 'completed')}
+                          style={{
+                            fontSize: 11, fontWeight: 600, color: 'var(--accent)',
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap',
+                            transition: 'background 0.1s',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--accent-light)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                          ✓ Complete
+                        </button>
+                      )}
+                      {seasonLink && (
+                        <a
+                          href={seasonLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            fontSize: 13, color: 'var(--accent)',
+                            textDecoration: 'none', fontWeight: 600,
+                            whiteSpace: 'nowrap', padding: '5px 8px',
+                            borderRadius: 6, transition: 'background 0.1s',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                          Watch ↗
+                        </a>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -864,13 +994,29 @@ function AnimeModal({ anime, onClose, onEdit, onDelete, onEpisode }) {
               background: 'var(--bg-hover)', borderRadius: 10, padding: 16,
               display: 'flex', alignItems: 'center', gap: 12,
             }}>
-              <span style={{ fontSize: 28 }}>🎬</span>
-              <div>
+              <IconMovie size={28} />
+              <div style={{ flex: 1 }}>
                 <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>Movie</p>
                 <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                  Track by changing its status above
+                  {anime.status === 'completed' ? 'Watched' : 'Not yet watched'}
                 </p>
               </div>
+              {anime.status !== 'completed' && (
+                <button
+                  onClick={() => onAnimeStatus(anime.id, 'completed')}
+                  style={{
+                    padding: '6px 14px',
+                    background: 'var(--green-bg)', color: 'var(--green)',
+                    border: '1px solid var(--green)', borderRadius: 8,
+                    fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--green)'; e.currentTarget.style.color = '#fff' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'var(--green-bg)'; e.currentTarget.style.color = 'var(--green)' }}
+                >
+                  ✓ Watched
+                </button>
+              )}
             </div>
           )}
 
@@ -881,28 +1027,52 @@ function AnimeModal({ anime, onClose, onEdit, onDelete, onEpisode }) {
             <p style={{
               fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
               textTransform: 'uppercase', letterSpacing: '0.08em',
-              marginBottom: 12, paddingLeft: 2,
+              marginBottom: 12,
             }}>
               Progress
             </p>
 
-            <p style={{ fontSize: 17, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 10 }}>
-              {label}
-              {totalEpisodes !== null && !isMovie && (
-                <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 8 }}>
-                  {totalWatched} / {totalEpisodes}
-                </span>
-              )}
-            </p>
-
-            {progress !== null && (
-              <div style={{ width: '100%', height: 5, background: 'var(--border)', borderRadius: 3, marginBottom: 16 }}>
-                <div style={{
-                  height: '100%', width: `${progress}%`,
-                  background: progress === 100 ? 'var(--green)' : 'var(--accent)',
-                  borderRadius: 3, transition: 'width 0.3s',
-                }} />
+            {!isMovie && seasons.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+                {seasons.map(s => {
+                  const sp = seasonProgress(s)
+                  const sEp = Number(s.current_episode || (s.season_number === (anime.current_season || 1) ? anime.episode : 0))
+                  const sMax = s.episode_count || 12
+                  return (
+                    <div key={s.season_number}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)' }}>
+                          Season {s.season_number} · Ep {Math.min(sEp, sMax)}/{sMax}
+                        </span>
+                        {sp !== null && (
+                          <span style={{ fontSize: 11, color: sp === 100 ? 'var(--green)' : 'var(--text-muted)' }}>
+                            {Math.round(sp)}%
+                          </span>
+                        )}
+                      </div>
+                      {sp !== null && (
+                        <div style={{ width: '100%', height: 4, background: 'var(--border-light)', borderRadius: 99, overflow: 'hidden' }}>
+                          <div style={{
+                            height: '100%', width: `${sp}%`,
+                            background: sp === 100 ? 'var(--green)' : 'var(--accent)',
+                            borderRadius: 99, transition: 'width 0.4s var(--ease-spring)',
+                          }} />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
+            ) : (
+              progress !== null && (
+                <div style={{ width: '100%', height: 6, background: 'var(--border-light)', borderRadius: 99, overflow: 'hidden', marginBottom: 16 }}>
+                  <div style={{
+                    height: '100%', width: `${progress}%`,
+                    background: progress === 100 ? 'var(--green)' : 'var(--accent)',
+                    borderRadius: 99, transition: 'width 0.4s var(--ease-spring)',
+                  }} />
+                </div>
+              )
             )}
 
             {!isMovie && (
@@ -911,29 +1081,35 @@ function AnimeModal({ anime, onClose, onEdit, onDelete, onEpisode }) {
                   <button
                     onClick={() => handleEpisode(-1)}
                     style={{
-                      width: 34, height: 34,
-                      border: '1px solid var(--border)', borderRadius: 8,
+                      width: 36, height: 36,
+                      border: '1px solid var(--border)', borderRadius: 10,
                       background: 'var(--bg-main)', color: 'var(--text-secondary)',
                       fontSize: 18, cursor: 'pointer', display: 'flex',
                       alignItems: 'center', justifyContent: 'center',
+                      transition: 'background 0.15s, border-color 0.15s',
                     }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.borderColor = 'var(--accent-border)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-main)'; e.currentTarget.style.borderColor = 'var(--border)' }}
                   >−</button>
                   <span style={{
-                    flex: 1, fontSize: 14, fontWeight: 500, color: 'var(--text-secondary)',
+                    flex: 1, fontSize: 14, fontWeight: 500, color: 'var(--text-primary)',
                     textAlign: 'center', background: 'var(--bg-hover)',
-                    padding: '6px 0', borderRadius: 8,
+                    padding: '7px 0', borderRadius: 10, border: '1px solid var(--border-light)',
                   }}>
                     Ep {anime.episode}
                   </span>
                   <button
                     onClick={() => handleEpisode(1)}
                     style={{
-                      width: 34, height: 34,
-                      border: '1px solid var(--border)', borderRadius: 8,
+                      width: 36, height: 36,
+                      border: '1px solid var(--border)', borderRadius: 10,
                       background: 'var(--bg-main)', color: 'var(--text-secondary)',
                       fontSize: 18, cursor: 'pointer', display: 'flex',
                       alignItems: 'center', justifyContent: 'center',
+                      transition: 'background 0.15s, border-color 0.15s',
                     }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.borderColor = 'var(--accent-border)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-main)'; e.currentTarget.style.borderColor = 'var(--border)' }}
                   >+</button>
                 </div>
                 {seasons.length > 1 && (
@@ -947,7 +1123,10 @@ function AnimeModal({ anime, onClose, onEdit, onDelete, onEpisode }) {
                         fontSize: 13, cursor: (anime.current_season || 1) > 1 ? 'pointer' : 'default',
                         opacity: (anime.current_season || 1) > 1 ? 1 : 0.3,
                         color: 'var(--text-secondary)',
+                        transition: 'background 0.15s, border-color 0.15s',
                       }}
+                      onMouseEnter={e => { if ((anime.current_season || 1) > 1) { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.borderColor = 'var(--accent-border)' } }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-main)'; e.currentTarget.style.borderColor = 'var(--border)' }}
                     >‹ Prev</button>
                     <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-muted)' }}>
                       S{anime.current_season || 1} of {seasons.length}
@@ -961,11 +1140,61 @@ function AnimeModal({ anime, onClose, onEdit, onDelete, onEpisode }) {
                         fontSize: 13, cursor: (anime.current_season || 1) < seasons.length ? 'pointer' : 'default',
                         opacity: (anime.current_season || 1) < seasons.length ? 1 : 0.3,
                         color: 'var(--text-secondary)',
+                        transition: 'background 0.15s, border-color 0.15s',
                       }}
+                      onMouseEnter={e => { if ((anime.current_season || 1) < seasons.length) { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.borderColor = 'var(--accent-border)' } }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-main)'; e.currentTarget.style.borderColor = 'var(--border)' }}
                     >Next ›</button>
                   </div>
                 )}
               </>
+            )}
+
+            {anime.status !== 'completed' && (
+              <div style={{ marginTop: 4 }}>
+                {isMovie ? (
+                  <button
+                    onClick={() => onAnimeStatus(anime.id, 'completed')}
+                    style={{
+                      width: '100%', padding: '9px 0',
+                      background: 'var(--green-bg)', color: 'var(--green)',
+                      border: '1px solid var(--green)', borderRadius: 10,
+                      fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                      transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--green)'; e.currentTarget.style.color = '#fff' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'var(--green-bg)'; e.currentTarget.style.color = 'var(--green)' }}
+                  >
+                    ✓ Mark as watched
+                  </button>
+                ) : (
+                  (() => {
+                    const curSeason = seasons.find(s => s.season_number === (anime.current_season || 1))
+                    const maxEp = curSeason?.episode_count || anime.total_episodes || 12
+                    const atMax = Number(anime.episode) >= maxEp
+                    const isLastSeason = (anime.current_season || 1) >= seasons.length
+                    if (atMax && isLastSeason) {
+                      return (
+                        <button
+                          onClick={() => onAnimeStatus(anime.id, 'completed')}
+                          style={{
+                            width: '100%', padding: '9px 0',
+                            background: 'var(--green-bg)', color: 'var(--green)',
+                            border: '1px solid var(--green)', borderRadius: 10,
+                            fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                            transition: 'background 0.15s',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'var(--green)'; e.currentTarget.style.color = '#fff' }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'var(--green-bg)'; e.currentTarget.style.color = 'var(--green)' }}
+                        >
+                          ✓ Complete anime
+                        </button>
+                      )
+                    }
+                    return null
+                  })()
+                )}
+              </div>
             )}
           </div>
 
@@ -997,11 +1226,12 @@ function AnimeModal({ anime, onClose, onEdit, onDelete, onEpisode }) {
 
 // ─── Sidebar (unchanged) ─────────────────────────────────────────────────────
 
-function Sidebar({ animes, activeNav, onNav, theme, onThemeToggle }) {
+function Sidebar({ animes, activeNav, onNav, theme, onThemeToggle, onExport, onImport }) {
   const counts = {}
   UNFINISHED_STATUSES.forEach(s => { counts[s] = animes.filter(a => a.status === s).length })
   counts.all = animes.filter(a => UNFINISHED_STATUSES.includes(a.status)).length
   counts.completed = animes.filter(a => a.status === 'completed').length
+  const importRef = useRef(null)
 
   const NavItem = ({ id, label, count }) => {
     const active = activeNav === id
@@ -1015,10 +1245,10 @@ function Sidebar({ animes, activeNav, onNav, theme, onThemeToggle }) {
           color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
           fontSize: 13, fontWeight: active ? 500 : 400,
           textAlign: 'left', cursor: 'pointer',
-          transition: 'background 0.1s, color 0.1s',
+          transition: 'background 0.15s, color 0.15s',
         }}
-        onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--bg-hover)' }}
-        onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
+        onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-primary)' }}
+        onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)' }}
       >
         <span>{label}</span>
         {count > 0 && (
@@ -1038,21 +1268,21 @@ function Sidebar({ animes, activeNav, onNav, theme, onThemeToggle }) {
       position: 'sticky', top: 0, overflow: 'hidden',
     }}>
       <div style={{ padding: '20px 16px 14px', borderBottom: '1px solid var(--border)' }}>
-        <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>AnimeVault</p>
-        <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>Track your watchlist</p>
+        <p style={{ fontSize: 16, fontWeight: 600, fontFamily: 'var(--font-display)', color: 'var(--text-primary)', letterSpacing: '0.02em' }}>AnimeVault</p>
+        <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Track your watchlist</p>
       </div>
 
       <nav style={{ flex: 1, padding: '12px 8px', overflow: 'auto' }}>
-        <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.08em', padding: '4px 10px 6px', textTransform: 'uppercase' }}>
+        <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.08em', padding: '4px 10px 8px', textTransform: 'uppercase' }}>
           Active
         </p>
         {NAV.map(n => (
           <NavItem key={n.id} id={n.id} label={n.label} count={n.id === 'all' ? counts.all : counts[n.id] || 0} />
         ))}
 
-        <div style={{ height: 1, background: 'var(--border)', margin: '10px 4px' }} />
+        <div style={{ height: 1, background: 'var(--border-light)', margin: '10px 10px' }} />
 
-        <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.08em', padding: '4px 10px 6px', textTransform: 'uppercase' }}>
+        <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.08em', padding: '4px 10px 8px', textTransform: 'uppercase' }}>
           Finished
         </p>
         <NavItem id="completed" label="Completed" count={counts.completed} />
@@ -1065,15 +1295,30 @@ function Sidebar({ animes, activeNav, onNav, theme, onThemeToggle }) {
             display: 'flex', alignItems: 'center', gap: 8,
             background: 'none', border: 'none', cursor: 'pointer',
             color: 'var(--text-secondary)', fontSize: 13, padding: '4px 0',
-            width: '100%',
+            width: '100%', transition: 'color 0.15s',
           }}
+          onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+          onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}
         >
-          <span style={{ fontSize: 15 }}>{theme === 'dark' ? '☀️' : '🌙'}</span>
+          {theme === 'dark' ? <IconSun size={15} /> : <IconMoon size={15} />}
           {theme === 'dark' ? 'Light mode' : 'Dark mode'}
         </button>
         <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
-          {animes.length} anime{animes.length !== 1 ? 's' : ''} saved
+          {animes.length} anime{animes.length !== 1 ? 's' : ''}
         </p>
+        <input ref={importRef} type="file" accept=".json" onChange={onImport} style={{ display: 'none' }} />
+        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          <button onClick={onExport} style={{
+            flex: 1, padding: '5px 0', fontSize: 11, fontWeight: 500,
+            background: 'var(--bg-hover)', color: 'var(--text-secondary)',
+            border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer',
+          }}>Export</button>
+          <button onClick={() => importRef.current?.click()} style={{
+            flex: 1, padding: '5px 0', fontSize: 11, fontWeight: 500,
+            background: 'var(--bg-hover)', color: 'var(--text-secondary)',
+            border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer',
+          }}>Import</button>
+        </div>
       </div>
     </aside>
   )
@@ -1103,7 +1348,7 @@ function MainContent({ animes, activeNav, onEdit, onDelete, onEpisode, onAdd, on
         position: 'sticky', top: 0, zIndex: 10,
       }}>
         <div>
-          <h1 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>{title}</h1>
+          <h1 style={{ fontSize: 16, fontWeight: 600, fontFamily: 'var(--font-display)', color: 'var(--text-primary)', letterSpacing: '0.01em' }}>{title}</h1>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>
             {list.length} {list.length === 1 ? 'title' : 'titles'}
             {search ? ' matching your search' : ''}
@@ -1128,7 +1373,7 @@ function MainContent({ animes, activeNav, onEdit, onDelete, onEpisode, onAdd, on
         {list.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
             <p style={{ fontSize: 32, marginBottom: 12 }}>
-              {isCompletedView ? '🎉' : '📺'}
+              {isCompletedView ? <IconSparkle size={32} /> : <IconTV size={32} />}
             </p>
             <p style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
               {search
@@ -1186,22 +1431,37 @@ function CompletedRow({ anime, onEdit, onDelete }) {
   const label = getEpLabel(anime)
   const isMovie = anime.type === 'movie'
 
+  const progress = computeProgress(anime)
+
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12,
       padding: '12px 16px',
       borderBottom: '1px solid var(--border-light)',
-    }}>
-      <div style={{ width: 40, height: 56, background: 'var(--bg-hover)', borderRadius: 'var(--radius-sm)', overflow: 'hidden', flexShrink: 0 }}>
+      transition: 'background 0.15s',
+    }}
+      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+    >
+      <div style={{ width: 40, height: 56, background: 'var(--bg-hover)', borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>
         {anime.image ? (
-          <img src={`http://localhost:3001/uploads/${anime.image}`} alt={anime.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }}/>
+          <img src={`/uploads/${anime.image}`} alt={anime.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }}/>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 20 }}>🎬</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}><IconMovie size={20} /></div>
         )}
       </div>
       <span style={{ flex: 1, fontWeight: 500, fontSize: 14, color: 'var(--text-primary)' }}>
         {anime.name}
       </span>
+      {progress !== null && (
+        <div style={{ width: 120, height: 4, background: 'var(--border-light)', borderRadius: 99, overflow: 'hidden', flexShrink: 0 }}>
+          <div style={{
+            height: '100%', width: `${progress}%`,
+            background: 'linear-gradient(90deg, var(--green), var(--green))',
+            borderRadius: 99,
+          }} />
+        </div>
+      )}
       {isMovie && <span style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-hover)', padding: '2px 6px', borderRadius: 'var(--radius-sm)' }}>Movie</span>}
       <StatusBadge status={anime.status} />
       <span style={{ fontSize: 12, color: 'var(--text-secondary)', minWidth: 80, textAlign: 'right' }}>
@@ -1322,8 +1582,10 @@ export default function App() {
               season_number: s.season_number,
               episode_count: s.episode_count != null ? String(s.episode_count) : '',
               link: s.link || '',
+              season_status: s.season_status || 'watching',
+              current_episode: String(s.current_episode || 1),
             }))
-          : [{ season_number: 1, episode_count: anime.total_episodes != null ? String(anime.total_episodes) : '', link: anime.link || '' }],
+          : [{ season_number: 1, episode_count: anime.total_episodes != null ? String(anime.total_episodes) : '', link: anime.link || '', season_status: 'watching', current_episode: '1' }],
     })
     setViewState('cards-leaving')
   }
@@ -1335,10 +1597,10 @@ export default function App() {
   const handleFormSave = async (data, imageFile) => {
     setSaving(true)
     try {
-      // Build payload: include seasons in the data JSON
       const payload = { ...data }
-      if (data.seasons) {
+      if (data.seasons && data.seasons.length) {
         payload.seasons = data.seasons
+        payload.status = deriveAnimeStatus(data.seasons)
       }
       if (editingAnime?.id) {
         const updated = await api.update(editingAnime.id, payload, imageFile, data.keepImage)
@@ -1368,6 +1630,73 @@ export default function App() {
     }
   }
 
+  const handleExport = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/backup/export`)
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error || 'Export failed')
+      const blob = new Blob([JSON.stringify(body, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `animevault_${Date.now()}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      showToast('Backup downloaded!')
+    } catch (err) {
+      showToast(err.message, 'error')
+    }
+  }
+
+  const handleImport = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    try {
+      const formData = new FormData()
+      formData.append('backup', file)
+      const res = await fetch(`${API_URL}/api/backup/import`, { method: 'POST', body: formData })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Import failed')
+      setAnimes(data)
+      showToast(`Imported ${data.length} anime!`)
+    } catch (err) {
+      showToast(err.message, 'error')
+    }
+    e.target.value = ''
+  }
+
+  const handleSeasonStatus = useCallback(async (id, seasonNumber, status) => {
+    const prev = animes.find(a => a.id === id)
+    if (!prev) return
+    const updatedSeasons = (prev.seasons || []).map(s =>
+      s.season_number === seasonNumber ? { ...s, season_status: status } : s
+    )
+    const newStatus = deriveAnimeStatus(updatedSeasons)
+    setAnimes(list => list.map(a => a.id === id ? {
+      ...a, status: newStatus, seasons: updatedSeasons,
+    } : a))
+    try {
+      const updated = await api.patchSeasonStatus(id, seasonNumber, status)
+      setAnimes(list => list.map(a => a.id === updated.id ? updated : a))
+    } catch {
+      setAnimes(list => list.map(a => a.id === id ? prev : a))
+      showToast('Could not update season status', 'error')
+    }
+  }, [animes, showToast])
+
+  const handleAnimeStatus = useCallback(async (id, status) => {
+    const prev = animes.find(a => a.id === id)
+    if (!prev) return
+    setAnimes(list => list.map(a => a.id === id ? { ...a, status } : a))
+    try {
+      const updated = await api.patchStatus(id, status)
+      setAnimes(list => list.map(a => a.id === updated.id ? updated : a))
+    } catch {
+      setAnimes(list => list.map(a => a.id === id ? prev : a))
+      showToast('Could not update anime status', 'error')
+    }
+  }, [animes, showToast])
+
   const handleEpisode = async (id, newEp, newSeason) => {
     const prev = animes.find(a => a.id === id)
     if (!prev) return
@@ -1375,18 +1704,30 @@ export default function App() {
     let ep = newEp
     let season = newSeason !== undefined ? newSeason : (prev.current_season || 1)
 
-    // If seasons exist, clamp episode within the current season's count
     const curSeason = seasons.find(s => s.season_number === season)
     const maxEp = curSeason?.episode_count
     if (maxEp != null) {
-      if (ep < 0) { ep = 0 } else if (ep > maxEp) { ep = maxEp }
+      if (ep < 1) { ep = 1 } else if (ep > maxEp) { ep = maxEp }
     } else {
-      if (ep < 0) ep = 0
+      if (ep < 1) ep = 1
     }
 
-    setAnimes(list => list.map(a => a.id === id ? { ...a, episode: ep, current_season: season } : a))
+    // Auto-complete season when episode reaches max
+    const shouldComplete = curSeason && maxEp != null && ep >= maxEp && curSeason.season_status !== 'completed'
+    let newAnimeStatus = prev.status
+    const updatedSeasons = (prev.seasons || []).map(s => {
+      if (s.season_number === season) {
+        return { ...s, current_episode: ep, season_status: shouldComplete ? 'completed' : s.season_status }
+      }
+      return s
+    })
+    if (shouldComplete) newAnimeStatus = deriveAnimeStatus(updatedSeasons)
+
+    setAnimes(list => list.map(a => a.id === id ? {
+      ...a, episode: ep, current_season: season, status: newAnimeStatus, seasons: updatedSeasons,
+    } : a))
     try {
-      const updated = await api.patchEpisode(id, ep, season)
+      const updated = await api.patchEpisode(id, ep, season, shouldComplete ? 'completed' : undefined)
       setAnimes(list => list.map(a => a.id === updated.id ? updated : a))
     } catch {
       setAnimes(list => list.map(a => a.id === id ? prev : a))
@@ -1396,8 +1737,10 @@ export default function App() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-secondary)', fontSize: 14 }}>
-        Loading…
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: 16 }}>
+        <div style={{ width: 32, height: 32, border: '3px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <p style={{ color: 'var(--text-secondary)', fontSize: 14, fontWeight: 500, fontFamily: 'var(--font-display)' }}>Loading your vault…</p>
+        <style>{'@keyframes spin { to { transform: rotate(360deg) } }'}</style>
       </div>
     )
   }
@@ -1410,6 +1753,8 @@ export default function App() {
         onNav={(id) => { setActiveNav(id); setViewState('cards'); setEditingAnime(null) }}
         theme={theme}
         onThemeToggle={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+        onExport={handleExport}
+        onImport={handleImport}
       />
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh', overflow: 'auto', background: 'var(--bg-page)', position: 'relative' }}>
         {/* Cards view */}
@@ -1441,7 +1786,7 @@ export default function App() {
             transition: 'opacity 0.35s ease, transform 0.35s ease',
             opacity: viewState === 'form-leaving' ? 0 : 1,
             transform: viewState === 'form-leaving' ? 'translateY(-6px)' : 'translateY(0)',
-            display: 'flex', justifyContent: 'center',
+            display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
             padding: 24,
           }}>
             <AnimeForm
@@ -1460,6 +1805,8 @@ export default function App() {
           onEdit={handleEdit}
           onDelete={handleDelete}
           onEpisode={handleEpisode}
+          onSeasonStatus={handleSeasonStatus}
+          onAnimeStatus={handleAnimeStatus}
         />
       )}
       <Toast toast={toast} />
@@ -1469,6 +1816,6 @@ export default function App() {
 
 function anime_clamp(ep, total) {
   if (total != null && ep > total) return total
-  if (ep < 0) return 0
+  if (ep < 1) return 1
   return ep
 }

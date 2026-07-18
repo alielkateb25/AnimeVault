@@ -5,25 +5,25 @@
 }
 
 :root {
-  --bg-page:      #F4F2EE;
-  --bg-sidebar:   #ECEAE4;
+  --bg-page:      #F7F4F0;
+  --bg-sidebar:   #EFEBE6;
   --bg-main:      #FFFFFF;
-  --bg-hover:     #ECEAE4;
-  --bg-active:    #E4E0D8;
-  --bg-input:     #F9F8F6;
-  --bg-tag:       #ECEAE4;
+  --bg-hover:     #F0EBE6;
+  --bg-active:    #E8E0D8;
+  --bg-input:     #FAF8F6;
+  --bg-tag:       #F0EBE6;
 
   --border:       #DDD9D0;
-  --border-light: #ECEAE4;
+  --border-light: #EBE6E0;
 
-  --text-primary:   #1A1916;
-  --text-secondary: #6B6760;
-  --text-muted:     #9E9990;
+  --text-primary:   #1A1412;
+  --text-secondary: #6B6360;
+  --text-muted:     #9E9690;
   --text-inverse:   #FAFAF8;
 
-  --accent:        #C2510E;
-  --accent-light:  #FBF0E9;
-  --accent-border: #F0C4A5;
+  --accent:        #E11D48;
+  --accent-light:  #FFF0F2;
+  --accent-border: #FECDD3;
 
   --green:  #15803D;
   --green-bg: #F0FDF4;
@@ -36,34 +36,35 @@
   --gray:   #4B5563;
   --gray-bg: #F9FAFB;
 
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
 
   --sidebar-w: 224px;
-  --font: 'DM Sans', -apple-system, system-ui, sans-serif;
+  --font: 'Poppins', -apple-system, system-ui, sans-serif;
+  --font-display: 'Righteous', cursive;
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 [data-theme="dark"] {
-  --bg-page:      #111110;
-  --bg-sidebar:   #161614;
-  --bg-main:      #1C1B19;
-  --bg-hover:     #232220;
-  --bg-active:    #2A2926;
-  --bg-input:     #232220;
-  --bg-tag:       #2A2926;
+  --bg-page:      #0E0E10;
+  --bg-sidebar:   #161618;
+  --bg-main:      #1C1C1E;
+  --bg-hover:     #252527;
+  --bg-active:    #2C2C2E;
+  --bg-input:     #252527;
+  --bg-tag:       #2C2C2E;
 
-  --border:       #2E2C28;
-  --border-light: #252320;
+  --border:       #333336;
+  --border-light: #2A2A2C;
 
-  --text-primary:   #EDEBE6;
-  --text-secondary: #A09B94;
+  --text-primary:   #F2F0ED;
+  --text-secondary: #A09C98;
   --text-muted:     #6B6760;
-  --text-inverse:   #1A1916;
 
-  --accent:        #E07B39;
-  --accent-light:  #2A1A0E;
-  --accent-border: #6B3416;
+  --accent:        #FB7185;
+  --accent-light:  #2C0F15;
+  --accent-border: #5C1A25;
 
   --green:  #4ADE80;
   --green-bg: #052E16;
@@ -98,4 +99,9 @@ a { color: inherit; text-decoration: none; }
 @keyframes formFadeIn {
   from { opacity: 0; transform: translateY(-8px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
